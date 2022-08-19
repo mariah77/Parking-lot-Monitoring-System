@@ -42,21 +42,56 @@ logging.getLogger().removeHandler(logging.getLogger().handlers[0])
 
 from scipy.spatial import distance
 
-  
+from tensorflow.keras.preprocessing import image
+
+# Flask utils
+from flask import Flask, redirect, url_for, request, render_template
+from werkzeug.utils import secure_filename
+from gevent.pywsgi import WSGIServer
+
+# Define a flask app
+app = Flask(__name__)
+device=select_device('')
+model = DetectMultiBackend("best_yolov5.pt", device=device, dnn=False, data=None, fp16=False)
+
+#Firebase Libraries
+import firebase_admin
+from firebase_admin import db
+
+#DateTime libraries
+from time import time
+from datetime import date,timedelta
+import datetime
+import calendar
+
+#Date Day findings
+my_date = date.today()
+pre_date=my_date-timedelta(days=1)
+day = calendar.day_name[my_date.weekday()]
+print(my_date)
+print(calendar.day_name[my_date.weekday()]  )
+time=datetime.datetime.now()
+hour=time.strftime("%H")
+print(hour)
+
+my_date=str(my_date)
+day=str(day)
+hour=str(hour)
+model_predicted_count=""
 
 
 @torch.no_grad()
 def run(
         source='0',
-        yolo_weights=WEIGHTS / 'yolov5m.pt',  # model.pt path(s),
-        strong_sort_weights=WEIGHTS / 'osnet_x0_25_msmt17.pt',  # model.pt path,
+        yolo_weights= 'best_yolov5.pt',  # model.pt path(s),
+        strong_sort_weights='osnet_x1_0_market1501.pt',  # model.pt path,
         config_strongsort=ROOT / 'strong_sort/configs/strong_sort.yaml',
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        show_vid=False,  # show results
+        show_vid=True,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
@@ -116,7 +151,7 @@ def run(
 
     # initialize StrongSORT
     cfg = get_config()
-    cfg.merge_from_file(opt.config_strongsort)
+    cfg.merge_from_file('strong_sort/configs/strong_sort.yaml')
 
     # Security features setting
     threshold = 200
@@ -211,6 +246,7 @@ def run(
                 xywhs = xyxy2xywh(det[:, 0:4])
                 confs = det[:, 4]
                 clss = det[:, 5]
+                return str(int(det.shape[0])) +' cars detected'
 
                 
 
@@ -227,7 +263,7 @@ def run(
                         bboxes = output[0:4]
                         id = output[4]
                         cls = output[5]
-
+                    
 
                         # Main code for security feature
                         x1 = bboxes[0]
@@ -277,6 +313,7 @@ def run(
             else:
                 strongsort_list[i].increment_ages()
                 LOGGER.info('No detections')
+                return "No Car Detected"
 
             # Stream results
             im0 = annotator.result()
@@ -314,7 +351,7 @@ def run(
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--yolo-weights', nargs='+', type=str, default=WEIGHTS / 'yolov5m.pt', help='model.pt path(s)')
+    parser.add_argument('--yolo-weights', nargs='+', type=str, default= 'best_yolov5.pt', help='model.pt path(s)')
     parser.add_argument('--strong-sort-weights', type=str, default=WEIGHTS / 'osnet_x0_25_msmt17.pt')
     parser.add_argument('--config-strongsort', type=str, default='strong_sort/configs/strong_sort.yaml')
     parser.add_argument('--source', type=str, default='0', help='file/dir/URL/glob, 0 for webcam')  
@@ -350,11 +387,120 @@ def parse_opt():
     return opt
 
 
+def model_predict(source, model):
+    
+    imgsz = (640,640)
+    stride, names, pt = model.stride, model.names, model.pt
+    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+    nr_sources = 1
+    model.warmup(imgsz=(1 if pt else nr_sources, 3, *imgsz))  # warmup
+    dt, seen = [0.0, 0.0, 0.0, 0.0], 0
+    curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
+    for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
+
+        t1 = time_sync()
+        im = torch.from_numpy(im).to(device)
+        im = im.float()  # uint8 to fp16/32
+        im /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if len(im.shape) == 3:
+            im = im[None]  # expand for batch dim
+        t2 = time_sync()
+        dt[0] += t2 - t1
+
+        # Inference
+        pred = model(im, augment=False, visualize=False)
+        print(pred)
+        if pred is None:
+            pred = "No cars detected"
+        return pred
+
+    # Preprocessing the image
+    #x = image.img_to_array(img)
+    # x = np.true_divide(x, 255)
+   # x = np.expand_dims(x, axis=0)
+
+    # Be careful how your trained model deals with the input
+    # otherwise, it won't make correct prediction!
+    #x = preprocess_input(x, mode='caffe')
+    pred = model(im, augment=False, visualize=False)
+    print(pred)
+    # preds = model.predict(img)
+    #return pred
+
+#Firebase connectivity
+def connectDB():
+    print(model_predicted_count)
+    if not firebase_admin._apps:
+        cred_obj = firebase_admin.credentials.Certificate('./parking-monitoring-syste-19fda-firebase-adminsdk-4196p-f6342ad4bd.json')
+        databaseURL='https://parking-monitoring-syste-19fda-default-rtdb.firebaseio.com/'
+        default_app = firebase_admin.initialize_app(cred_obj, {
+            'databaseURL':databaseURL
+            })
+    ref = db.reference("Cars detected")
+    return ref
+#Data insertion
+def insert_data(model_predicted_count):
+    ref=connectDB()
+    print(model_predicted_count)
+    ref.push({
+	"date":my_date, "day":day,"hour":hour, "car_count":model_predicted_count
+})
+
+#Data Extraction
+cars_count=[]
+def extract_data():
+    ref=connectDB()
+    outputData=ref.get()
+    # cars_count=[]
+    print("i",outputData.items())
+    for key,value in outputData.items():
+        ref1 = db.reference("/Cars detected/"+key)
+        cars_data=(ref1.get())
+        cars_count.append({"date":cars_data["date"],"day":cars_data["day"], "hour":cars_data["hour"], "car_count":cars_data["car_count"]})
+    print(cars_count,len(cars_count))
+        
+#Homepage Route
+@app.route('/', methods=['GET'])
+def index():
+    # Main page
+    extract_data()
+    print(len(cars_count))
+    return render_template('index.html',cars_count=cars_count)
+
+@app.route('/predict', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST':
+        # Get the file from post request
+        f = request.files['file']
+        # Save the file to ./uploads
+        basepath = os.path.dirname(__file__)
+        file_path = os.path.join(
+            basepath, 'uploads', secure_filename(f.filename))
+        f.save(file_path)
+        # Make prediction
+        preds = run(source=file_path, yolo_weights = ['best_yolov5.pt'])
+        print("Model is predicting.....")
+        print(preds)
+
+        # # Process your result for human
+        # # pred_class = preds.argmax(axis=-1)            # Simple argmax
+        # #pred_class = decode_predictions(preds, top=1)   # ImageNet Decode
+        # result = str(pred_class[0][0][1])               # Convert to string
+        model_predicted_count=preds
+        print(model_predicted_count)
+        insert_data(model_predicted_count)
+        extract_data()
+        return preds
+    return None
+
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
 
 if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)
+    app.run(debug=True)
+    # opt = parse_opt()
+    # main(opt)
+    
