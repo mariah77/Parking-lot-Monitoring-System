@@ -786,6 +786,7 @@ def upload():
     #         basepath, 'uploads', secure_filename(f.filename))
     #     f.save(file_path)
         # Make prediction
+<<<<<<< HEAD
 
         preds = run(source=file_path, yolo_weights = ['best_yolov5.pt'])
         print("Model is predicting.....")
@@ -819,6 +820,27 @@ def livestream():
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     run(**vars(opt))
+=======
+    preds = hourly_detections(yolo_weights = ['best_yolov5.pt'],  detections = True)
+    # # Process your result for human
+    # # pred_class = preds.argmax(axis=-1)            # Simple argmax
+    # #pred_class = decode_predictions(preds, top=1)   # ImageNet Decode
+    # result = str(pred_class[0][0][1])               # Convert to string
+    model_predicted_count=preds
+    print(model_predicted_count)
+    insert_data(model_predicted_count)
+    extract_data()
+    print("Data uploaded successfuly")
+    # return preds
+print("Scheduler Started............")
+sched = BackgroundScheduler(daemon=True)
+sched.add_job(upload,'interval',minutes=1)
+sched.start()
+
+# def main(opt):
+#     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
+#     run(**vars(opt))
+>>>>>>> 908ec42825a7a939889b66229bfc2e4d1b84faeb
 
     preds = hourly_detections(yolo_weights = ['best_yolov5.pt'],  detections = True)
     # # Process your result for human
