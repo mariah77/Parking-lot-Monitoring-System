@@ -1,6 +1,7 @@
 # pip install -r requirements.txt
 
 # base ----------------------------------------
+apscheduler 
 matplotlib>=3.2.2
 numpy>=1.18.5
 opencv-python>=4.1.1
@@ -48,3 +49,5 @@ gevent
 tensorflow>=2.4.1  # TFLite export (or tensorflow-cpu, tensorflow-aarch64)
 #openvino-dev  # OpenVINO export
 #git+https://github.com/PINTO0309/openvino2tensorflow #OpenVINO to TFLite export
+
+opencv-python

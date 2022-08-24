@@ -1,5 +1,7 @@
 import argparse
 from datetime import date
+import cv2
+
 import os
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -505,7 +507,7 @@ def hourly_detections(
                     dets_count = str(int(det.shape[0]))
                     LOGGER.info(dets_count + ' detections')
                     return dets_count
-                
+                ++-----------------------------------------------------------------------------+999*-*++
 
                 
 
@@ -775,6 +777,28 @@ def video_feed():
     return Response(livestream_detections(yolo_weights = ['best_yolov5.pt'],  livestream = True), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
+
+################ -------------livestream--------------------########################
+
+
+
+@app.route('/livestream')
+def livestream():
+    return render_template('livestream.html')
+
+
+##########################---------------Dashboard--------------##########################
+@app.route('/dashboard', methods=['GET'])
+def hello_world():
+    extract_data()
+    today = date.today()
+    today = today.strftime('%Y-%m-%d')
+    # print(today)
+    # print(type(today))
+    # for d in cars_count:
+    #     print(type(d.get("date")))
+    return render_template('dashboard.html',cars_count=cars_count,today=today)
+
 def upload():
     print("Data has started uploading")
     #if request.method == 'POST':
@@ -786,41 +810,6 @@ def upload():
     #         basepath, 'uploads', secure_filename(f.filename))
     #     f.save(file_path)
         # Make prediction
-<<<<<<< HEAD
-
-        preds = run(source=file_path, yolo_weights = ['best_yolov5.pt'])
-        print("Model is predicting.....")
-        print(preds)
-
-        # # Process your result for human
-        # # pred_class = preds.argmax(axis=-1)            # Simple argmax
-        # #pred_class = decode_predictions(preds, top=1)   # ImageNet Decode
-        # result = str(pred_class[0][0][1])               # Convert to string
-        model_predicted_count=preds
-        print(model_predicted_count)
-        insert_data(model_predicted_count)
-        extract_data()
-        return preds
-    return None
-
-@app.route('/dashboard', methods=['GET'])
-def hello_world():
-    extract_data()
-    today = date.today()
-    today = today.strftime('%Y-%m-%d')
-    print(today)
-    print(type(today))
-    for d in cars_count:
-        print(type(d.get("date")))
-    return render_template('dashboard.html',cars_count=cars_count,today=today)
-
-@app.route('/livestream')
-def livestream():
-    return render_template('livestream.html')
-def main(opt):
-    check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
-=======
     preds = hourly_detections(yolo_weights = ['best_yolov5.pt'],  detections = True)
     # # Process your result for human
     # # pred_class = preds.argmax(axis=-1)            # Simple argmax
@@ -840,28 +829,6 @@ sched.start()
 # def main(opt):
 #     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
 #     run(**vars(opt))
->>>>>>> 908ec42825a7a939889b66229bfc2e4d1b84faeb
-
-    preds = hourly_detections(yolo_weights = ['best_yolov5.pt'],  detections = True)
-    # # Process your result for human
-    # # pred_class = preds.argmax(axis=-1)            # Simple argmax
-    # #pred_class = decode_predictions(preds, top=1)   # ImageNet Decode
-    # result = str(pred_class[0][0][1])               # Convert to string
-    model_predicted_count=preds
-    print(model_predicted_count)
-    insert_data(model_predicted_count)
-    extract_data()
-    print("Data uploaded successfuly")
-    # return preds
-print("Scheduler Started............")
-sched = BackgroundScheduler(daemon=True)
-sched.add_job(upload,'interval',minutes=1)
-sched.start()
-
-# def main(opt):
-#     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-#     run(**vars(opt))
-
 
 
     
