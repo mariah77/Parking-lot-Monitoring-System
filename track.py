@@ -1,5 +1,5 @@
 import argparse
-
+from datetime import date
 import os
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -494,6 +494,20 @@ def upload():
         return preds
     return None
 
+@app.route('/dashboard', methods=['GET'])
+def hello_world():
+    extract_data()
+    today = date.today()
+    today = today.strftime('%Y-%m-%d')
+    print(today)
+    print(type(today))
+    for d in cars_count:
+        print(type(d.get("date")))
+    return render_template('dashboard.html',cars_count=cars_count,today=today)
+
+@app.route('/livestream')
+def livestream():
+    return render_template('livestream.html')
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     run(**vars(opt))
