@@ -1,7 +1,9 @@
 import argparse
 from datetime import date
 import cv2
-
+import json
+from statistics import mean
+import math
 import os
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -507,7 +509,7 @@ def hourly_detections(
                     dets_count = str(int(det.shape[0]))
                     LOGGER.info(dets_count + ' detections')
                     return dets_count
-                ++-----------------------------------------------------------------------------+999*-*++
+            
 
                 
 
@@ -729,12 +731,12 @@ def extract_data():
 
 
 #Homepage Route
-@app.route('/', methods=['GET'])
-def index():
-    print("Index page started")
-    # Main page
-    extract_data()
-    print(len(cars_count))
+# @app.route('/', methods=['GET'])
+# def index():
+#     print("Index page started")
+#     # Main page
+#     extract_data()
+#     print(len(cars_count))
     # preds = hourly_detections(yolo_weights = ['best_yolov5.pt'],  detections = True)
 
     # # Process your result for human
@@ -744,10 +746,10 @@ def index():
     # model_predicted_count=preds
     # insert_data(model_predicted_count)
     # extract_data()
-    print("Index page ended")
+    # print("Index page ended")
     
-    # run_continously()
-    return render_template('index.html',cars_count=cars_count)
+    # # run_continously()
+    # return render_template('index.html',cars_count=cars_count)
 #Continous Fuction
 # def run_continously():
 #     current_hour=-1
@@ -785,20 +787,95 @@ def video_feed():
 @app.route('/livestream')
 def livestream():
     return render_template('livestream.html')
+#----------------------------------------count functions-----------------------------###############
+def max_value_today(today):
+    today = today.strftime('%Y-%m-%d')
+    max_today = 0
+    max_today_list = []
+    print("Date : "+ today)
+    for d in cars_count:
+       if d.get("date") == today:     
+            max_today_list.append(int(d.get("car_count")))
+       
+    if len(max_today_list )!=0:
+        max_today = max(max_today_list)
 
+    return max_today
+
+def max_value_yesterday(today):
+    Previous_Date = datetime.datetime.today() - datetime.timedelta(days=1)
+    Previous_Date = Previous_Date.strftime('%Y-%m-%d') 
+    print ("Previous date:" + Previous_Date + " " +str(type(Previous_Date)))
+    max_prev = 0
+    max_prev_list = []
+    for d in cars_count:
+       if d.get("date") == Previous_Date:
+        max_prev_list.append(int(d.get("car_count")))
+       
+    if len(max_prev_list )!=0:
+        max_prev = max(max_prev_list)
+    return max_prev
+
+def max_value_weekly(today):
+    day_of_the_week = datetime.datetime.today().weekday() 
+    print("Day of the week " + str(day_of_the_week))
+    max_each_day=[]
+    avg_weekly = 0
+    max_each_day.append(max_value_today(today))
+    for i in range(0,day_of_the_week):
+    
+        
+        Previous_Date = datetime.datetime.today() - datetime.timedelta(days=i+1)
+        # Previous_Date = Previous_Date.strftime('%Y-%m-%d')      
+        maxd = max_value_today(Previous_Date)
+        # print ('Previous Date: ' + str(Previous_Date) + " Max  value: "+ str(maxd))
+        max_each_day.append(maxd)
+      
+    if len(max_each_day )!=0:
+        avg_weekly = mean(max_each_day)
+        avg_weekly = math.floor(avg_weekly)
+
+    asc_array = []
+    i = len(max_each_day)-1
+    while i>=0:
+        asc_array.append(max_each_day[i])
+        i = i-1
+    return avg_weekly,asc_array
+    
 
 ##########################---------------Dashboard--------------##########################
-@app.route('/dashboard', methods=['GET'])
+@app.route('/', methods=['GET'])
 def hello_world():
     extract_data()
     today = date.today()
-    today = today.strftime('%Y-%m-%d')
-    # print(today)
-    # print(type(today))
-    # for d in cars_count:
-    #     print(type(d.get("date")))
-    return render_template('dashboard.html',cars_count=cars_count,today=today)
+    max_today = max_value_today(today)
+    max_prev = max_value_yesterday(today)
+    max_weekly, max_each_day = max_value_weekly(today)
+    print("Max weekly value : " + str(max_weekly))
+    labels= []
+    for i in range(0,len(max_each_day)):
+        if i == 0:
+            labels.append('Mon')
+        elif i ==1 :
+            labels.append('Tues')
+        elif i==2:
+            labels.append('Wed')
+        elif i==3:
+            labels.append('Thurs')
+        elif i==4:
+            labels.append('Fri')
+        elif i==5:
+            labels.append('Sat')
+        elif i==7:
+            labels.append('Sun')
 
+    for j in range(len(max_each_day)):
+        print( labels[j] )
+
+    for j in range(len(max_each_day)):
+        print(max_each_day[j])
+        
+    return render_template('dashboard.html',cars_count=cars_count,today=today, max_today=max_today, max_prev=max_prev, max_weekly=max_weekly, max_each_day=json.dumps(max_each_day), labels=json.dumps(labels))
 def upload():
     print("Data has started uploading")
     #if request.method == 'POST':
@@ -823,7 +900,7 @@ def upload():
     # return preds
 print("Scheduler Started............")
 sched = BackgroundScheduler(daemon=True)
-sched.add_job(upload,'interval',minutes=1)
+sched.add_job(upload,'interval',minutes=30)
 sched.start()
 
 # def main(opt):
